@@ -1,5 +1,5 @@
 import {SvgPlus} from "./4.js"
-import {Vector3D, v3, Plane, Rotation, Quaternion} from "./Vector.js"
+import {Vector, v3, Rotation, Quaternion, BBox, argumentParser} from "./Vector.js"
 
 function styleString(style) {
   let str = ""
@@ -27,130 +27,105 @@ function propsString(props) {
   }
   return str;
 }
+
 function transform(point, offset, rotation, scale = 1) {
   let v = point.sub(offset);
-  v = v.rotate(rotation);
+  v = v.mul(Rotation.fromQuaternion(rotation));
   v = v.mul(scale);
-
   return v;
 }
 
+function tnow(){return performance.now()}
+function tlog(start, message) {
+  let dif = tnow() - start
+  console.log(`${message} took: ${Math.round(dif*1e2)/1e2}ms`);
+}
 
 function sin(v) {return Math.sin(v);}
 function cos(v) {return Math.cos(v);}
 function sqrt(v) {return Math.sqrt(v);}
-
-class BBox {
-  constructor(firstValue){
-    let min = null;
-    let max = null;
-
-    let addPoint = point => {
-      point = v3(point);
-      if (min == null) min = v3(point);
-      if (max == null) max = v3(point);
-
-      for (let i = 0; i < 3; i++) {
-        if (point[i] < min[i]) min[i] = point[i];
-        if (point[i] > max[i]) max[i] = point[i];
-      }
-    }
-
-    this.add = (value) => {
-      if (value instanceof BBox) {
-        addPoint(value.min);
-        addPoint(value.max);
-      } else {
-        addPoint(value);
-      }
-    }
-
-    Object.defineProperty(this, "value", {get: () => {return {min: min, max: max}}})
-    Object.defineProperty(this, "min", {get: () => v3(min)});
-    Object.defineProperty(this, "max", {get: () => v3(max)});
-    Object.defineProperty(this, "center", {get: () => this.min.add(this.max).div(2)});
-
-    if (firstValue) {
-      this.add(firstValue);
-    }
-  }
-}
 
 class Element3D {
   constructor(){
     this.props = {};
   }
 
-  toString() {return ""}
+  update(){
+    this._bbox = null;
+  }
 
   render(offset, rotation, scale = 1){
-    return {html: "", z: 0, bbox: new BBox()}
+    this.renderCache = {html: "", z: 0, bbox: new BBox()}
   }
 
-  getProps(info){
-    this.updateProps(info, this.props);
-    return this.props;
-  }
-
-  // user settable function
-  updateProps(info, props) {
+  // updates properties before rendering
+  updateProps() {
   }
 
   getBBox(){
     return new BBox();
   }
+
+  toString() {
+    this.updateProps(this.rdata, this.props);
+    return ""
+  }
+
+  get rdata(){
+    return this.renderCache;
+  }
+
+  get bbox(){
+    if (!this._bbox) {
+      this._bbox = this.getBBox();
+    }
+    return this._bbox;
+  }
+
+  // computes props string
+  get sprops(){
+    return propsString(this.props);
+  }
 }
+
 class Point3D extends Element3D {
-  constructor(v){
+  constructor(){
     super();
-    Object.defineProperty(this, "point", {
-      get: () => v,
-      set: (a) => v = v3(a)
-    })
+    this.point = argumentParser(arguments, Vector);
   }
 
   render(offset, rotation, scale = 1){
-    let v = transform(this.point, offset, rotation, scale);
-
-    let renderData = {
-      html: (info) => {
-        let props = propsString(this.getProps(info));
-        return `<ellipse cx = "${v.x}" cy = "${v.y}" ${props}></ellipse>`;
-      },
+    let v = Vector.parse(this.point);
+    v = transform(v, offset, rotation, scale);
+    this.renderCache = {
+      point: v,
       z: v.z,
       bbox: new BBox(v)
     }
-    return renderData;
   }
 
   getBBox(){
     return new BBox(this.point);
   }
+
+  toString(){
+    super.toString();
+    let v = this.rdata.point;
+    return `<ellipse cx = "${v.x}" cy = "${v.y}" ${this.sprops}></ellipse>`
+  }
 }
+
 class Path3D extends Element3D {
   constructor(a) {
     super();
-    let points = [];
+    this.points = [];
 
     if (a instanceof Array) {
       for (let point of a) {
-        let v = v3(point);
-        points.push(v);
+        let v = Vector.parse(point);
+        this.points.push(v);
       }
     }
-
-    Object.defineProperty(this, "points", {
-      get: () => {
-        let itterable = {
-          *[Symbol.iterator]() {
-            for (let point of points) {
-              yield point;
-            }
-          }
-        }
-        return itterable;
-      }
-    })
   }
 
   render(offset, rotation, scale = 1){
@@ -159,20 +134,21 @@ class Path3D extends Element3D {
     for (let point of this.points) {
       let v = transform(point, offset, rotation, scale);
       bbox.add(v);
-
       d += d.length == 0 ? "M" : "L";
       d += v.x + ", " + v.y;
     }
+
     let z = bbox.center.z;
-    let renderData = {
+    this.renderCache = {
       z: z,
       bbox: bbox,
-      html: (info) => {
-        let props = propsString(this.getProps(info));
-        return `<path d = "${d}" ${props}></path>`;
-      }
+      path: d,
     }
-    return renderData;
+  }
+
+  toString(){
+    super.toString();
+    return `<path d = "${this.rdata.path}" ${this.sprops}></path>`
   }
 
   getBBox(){
@@ -187,116 +163,111 @@ class Path3D extends Element3D {
 class Group3D extends SvgPlus {
   constructor(){
     super("g");
-
     this.props = {"g3d": ""}
 
-    let rotation = new Rotation();
-    Object.defineProperty(this, "rotation", {
-      get: () => {
-        let rot = new Rotation(rotation);
-        if (this.parent3D) {
-          rot.mul(this.parent3D.rotation);
-        }
-        return rot;
-      }
-    });
+    this._rotation = Quaternion.fromTo(new Vector(1), new Vector(1));
+    this._offset = new Vector();
+    this._scale = 1;
 
-    Object.defineProperty(this, "origin", {
-      get: () => {
-        let og = v3();
-        if (this.parent3D) {
-          og = og.add(this.parent3D.origin);
-        }
-        return og;
-      },
-    });
+    this.elements = [];
+  }
 
-    let offset = v3();
-    Object.defineProperty(this, "offset", {
-      get: () => {
-        return offset;
-      },
-      set: (v) => {
-        offset = v3(v);
-      }
-    });
-
-    let scale = 1;
-    Object.defineProperty(this, "scale", {
-      get: () => {
-        return scale;
-      },
-      set: (v) => {
-        scale = v3(v);
-      }
-    });
-
-    let elements = [];
-    let addElement = (e) => {
-      elements.push(e);
-      e.id = elements.length - 1;
+  get bbox(){
+    if (!this._bbox) {
+      this._bbox = this.getBBox();
     }
-    Object.defineProperty(this, "bounds", {
-      get: () => {
-        let bbox = new BBox();
-        for (let element of elements) {
-          bbox.add(element.getBBox());
-        }
-        return bbox;
-      }
-    })
+    return this._bbox;
+  }
 
-    this.addPoint = (v) => {
-      let point = new Point3D(v);
-      addElement(point)
-      return point;
+  getBBox(){
+    let bbox = new BBox();
+    for (let element of this.elements) {
+      bbox.add(element.bbox);
     }
-    this.addPath = (a) => {
-      let path = new Path3D(a);
-      addElement(path);
-      return path;
+    return bbox;
+  }
+
+  __render(){
+    // Get state information
+    let start = tnow();
+    let totalBBox = new BBox();
+    let offset = this.origin;
+    let rotation = this.rotation;
+    let scale = this.scale;
+    let elements = this.elements;
+    // tlog(start, "state information")
+
+    // compute render information [takes ~ 100ms]
+    start = tnow();
+    for (let element of elements) {
+      element.render(offset, rotation, scale);
+      totalBBox.add(element.rdata.bbox);
     }
+    // tlog(start, "render information");
 
-    let render = () => {
-      // compute render
-      let renderData = []
-      let totalBBox = new BBox();
-      let off = this.origin.add(offset);
-      let rot = this.rotation;
 
-      for (let element of elements) {
-        let data = element.render(off, rot, scale);
-        renderData.push(data);
-        totalBBox.add(data.bbox);
-      }
+    //sort elements by z index
+    start = tnow();
+    elements.sort((a, b) => a.rdata.z > b.rdata.z ? -1 : 1);
+    // tlog(start, "sorting by z")
 
-      //sort elements by z index
-      renderData.sort((a, b) => a.z > b.z ? -1 : 1);
-      let html = "";
-      for (let rdata of renderData) {
-        html += rdata.html({
-          z: rdata.z,
-          bbox: rdata.bbox,
-          totalBBox: totalBBox,
-        });
-      }
-
-      //display results
-      this.innerHTML = html;
+    // takes roughly 10ms
+    start = tnow();
+    let html = "";
+    for (let element of elements) {
+      element.rdata.totalBBox = totalBBox;
+      html += "" + element;
     }
+    // tlog(start, "generating html");
 
-    this.render = () => {
-      let start = performance.now();
+    //display results
+    start = tnow();
+    this.innerHTML = html;
+    // tlog(start, "setting html")
+  }
 
-      const event = new Event("render");
-      this.dispatchEvent(event);
+  render(){
+    let start = performance.now();
 
-      render();
-      return performance.now() - start;
+    const event = new Event("render");
+    this.dispatchEvent(event);
+
+    this.__render();
+    return performance.now() - start;
+  }
+
+  addPoint(v) {
+    let point = new Point3D(v);
+    this.elements.push(point);
+    return point;
+  }
+
+  addPath(a) {
+    let path = new Path3D(a);
+    this.elements.push(path);
+    return path;
+  }
+
+  get rotation(){
+    let rotation = this._rotation;
+    if (this.parent3D) {
+      rotation = this.parent3D.rotation;
     }
+    return rotation;
+  }
+
+  get origin(){
+    let og = new Vector;
+    if (this.parent3D) {
+      og = og.add(this.parent3D.origin);
+    }
+    return og;
+  }
+
+  get scale(){
+    return this._scale;
   }
 }
-
 
 class Svg3D extends SvgPlus {
   constructor(el){
@@ -312,11 +283,11 @@ class Svg3D extends SvgPlus {
       }
     });
 
+    this._rotation = Quaternion.fromTo(new Vector(1), new Vector(1));
+  }
 
-    let rotation = new Rotation();
-    Object.defineProperty(this, "rotation", {
-      get: () => rotation
-    });
+  get rotation(){
+    return this._rotation;
   }
 
   render(){
@@ -334,7 +305,7 @@ class Svg3D extends SvgPlus {
   get bounds(){
     let bbox = new BBox();
     for (let g of this.groups) {
-      bbox.add(g.bounds);
+      bbox.add(g.bbox);
     }
     return bbox;
   }
@@ -369,7 +340,7 @@ class Svg3D extends SvgPlus {
   }
 
   addRotationControlls(){
-    let tv = 2.015;
+    let tv = 0.4;
     let th = -0.37;
 
     this.rotate = (x = 0, y = 0) => {
@@ -378,19 +349,18 @@ class Svg3D extends SvgPlus {
     }
 
     let updateRotation = () => {
-      let hs = v3([0, 1, 0]);
-      let he = v3([0, cos(th), sin(th)]);
+      let hs = new Vector(1, 0, 0);
+      let he = new Vector(cos(th), sin(th), 0)
 
-      let vs = v3([0, 1, 0]);
-      let ve = v3([sin(tv), cos(tv), 0]);
+      let vs = new Vector(0, 0, -1);
+      let ve = new Vector(0, cos(tv), sin(tv));
 
       let q1 = Quaternion.fromTo(hs, he);
       let q2 = Quaternion.fromTo(vs, ve);
-
-      let q3 = q1.mul(q2);
-
-      this.rotation.fromQuaternion(q3);
+      let q3 = q2.product(q1);
+      this._rotation = q3;
     }
+
     this.addEventListener("render", updateRotation)
   }
 

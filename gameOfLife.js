@@ -56,7 +56,6 @@ class GameOfLife {
   }
 
   addLiving(x, y) {
-    console.log(this.set);
     this.oldLiving.push([x, y]);
     this.set(x, y, true);
   }

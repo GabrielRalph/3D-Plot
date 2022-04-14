@@ -71,9 +71,13 @@
     #defs {
       display: none;
     }
+    ellipse:not(.alive) {
+      fill: grey;
+      opacity: 0.2;
+    }
     .alive {
       fill: white;
-      filter: url(#glow);
+      /* filter: url(#glow); */
     }
 
     svg-3d {display: block;}

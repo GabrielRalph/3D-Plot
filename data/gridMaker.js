@@ -1,5 +1,6 @@
 import {SvgPlus} from "../4.js"
-import {Vector3D, v3} from "../Vector.js"
+import {Vector, v3} from "../Vector.js"
+
 
 function min(){
   let min = null;

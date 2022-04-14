@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+  </head>
+  <body>
+
+  </body>
+  <script type = "module">
+    import {Vector} from "./Vector2.js"
+    function tnow(){return performance.now()}
+    function tlog(start, message) {
+      let dif = tnow() - start
+      console.log(`${message} took: ${Math.round(dif*1e2)/1e2}ms`);
+      return dif;
+    }
+    function mnow(){
+      return performance.memory.usedJSHeapSize;
+    }
+
+
+
+
+    let a = new Vector(33, 55, 88);
+    let b = new Vector(11, 11, 11);
+    let c = a.add(b)
+
+    let list = [];
+
+    let delay = async (x) => {return new Promise((resolve) => setTimeout(resolve, x));}
+
+    let testVectors = () => {
+      for (let i = 0; i < 10000; i++){
+        let a = new Vector(3, 5555, 88888);
+        let b = a.mul(new Vector(2, 5, 8))
+        a = a.add(b);
+        list.push(a)
+      }
+    }
+
+    let test = async () => {
+      let tsum = 0;
+      let msum = 0;
+      let mdif;
+      let i;
+      for (i = 1; i < 100; i++) {
+        let ms = mnow();
+        await delay(30);
+        let ts = tnow();
+        testVectors();
+        tsum += tlog(ts, "making vectors");
+        await delay(30);
+        let mdif = mnow() - ms;
+        msum += mdif;
+      }
+      console.log(`memory: ${mdif}\naverage time: ${tsum/i}\naverage memory: ${msum/i}`);
+    }
+
+    test();
+    // testVectors();
+
+
+  </script>
+</html>

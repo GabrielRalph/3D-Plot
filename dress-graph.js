@@ -1,7 +1,7 @@
 import {SvgPlus} from "./4.js"
 import {} from "./svg-3d.js"
 import {loadGrid} from "./data/gridMaker.js";
-import {Vector3D, v3, Plane, Rotation, Quaternion} from "./Vector.js"
+import {Vector, v3, Rotation, Quaternion} from "./Vector.js"
 
 class DressGraph extends SvgPlus {
   constructor(el){
@@ -39,7 +39,7 @@ class DressGraph extends SvgPlus {
         let zMin = info.totalBBox.min.z;
         let zMax = info.totalBBox.max.z;
 
-        let r = 6 - 3*(info.z - zMin)/(zMax - zMin);
+        let r = 4 - 2*(info.z - zMin)/(zMax - zMin);
         props.rx = r;
         props.ry = r;
       }
@@ -101,8 +101,8 @@ class DressGraph extends SvgPlus {
 
     plot.onmousemove = (e) => {
       if (e.buttons == 1) {
-        let dx = -1 *e.movementX/200;
-        let dy = e.movementY/200;
+        let dx = -e.movementX/200;
+        let dy = -e.movementY/200;
         plot.rotate(dx, dy);
       }
     }

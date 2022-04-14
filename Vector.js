@@ -1,500 +1,392 @@
-function parseNumber(word) {
-  let num = word;
-  if (typeof num === "string") {
-    num = parseFloat(word);
-  }
-
-  if (typeof num !== "number" || Number.isNaN(num)) {
-    num = null;
-  }
-  return num;
+function sqrt(v){
+  return Math.sqrt(v)
 }
-
-class NumberArray extends Array {
-  push(value){
-    value = parseNumber(value);
-    if (value != null) {
-      super.push(value);
-    }
-    return this.length;
-  }
-
-  unshift(value){
-    value = parseNumber(value);
-    if (value != null) {
-      super.unshift(value);
-    }
-    return this.length;
-  }
-}
-
-function parseStringVector(value) {
-  let words = value.split(/,\s*/g);
-  let nums = new NumberArray();
-  for (let word of words) {
-    nums.push(word);
-  }
-  return nums;
-}
-
-const STANDARD_KEYS = [
-  ["x", "y", "z", "w", "v", "u", "t", "s"],
-  ["clientX", "clientY"]
-]
-
-function parseObjectVector(obj) {
-  let nums = new NumberArray();
-  if (obj instanceof Function) {
-    nums = parseVector(obj());
-  } else if (obj != null) {
-    // search for the key scheme
-    let n = STANDARD_KEYS.length;
-    let ki;
-    for (ki = 0; ki < n; ki ++) {
-      if (STANDARD_KEYS[ki][0] in obj) break;
-    }
-
-    // add values
-    if (ki < n) {
-      let keys = STANDARD_KEYS[ki];
-      for (let key of keys) {
-        nums.push(obj[key])
-      }
-    } else {
-      let i = 0;
-      while (i in obj) {
-        nums.push(obj[i]);
-        i++;
-      }
-    }
-  }
-  return nums;
-}
-
-function parseVector(value) {
-  if (value instanceof NumberArray) {
-    return value;
-  }
-
-  let vector = new NumberArray();
-  switch (typeof value) {
-    case "string":
-      vector = parseStringVector(value);
-      break;
-    case "number":
-      vector.push(value);
-      break;
-    case "object":
-      vector = parseObjectVector(value);
-      break;
-  }
-  return vector;
-}
-
-function numberToString(value) {
-  return Math.round(value*1e3)/1e3;
-}
-
-class Vector {
-  constructor(input, n = null, keys = STANDARD_KEYS[0]) {
-    input = parseVector(input);
-    if (n == null) n = input.length;
-    Object.defineProperty(this, "dimension", {
-      get: () => n
-    })
-
-    let data = {};
-    let addKey = (key, i = key) => {
-      Object.defineProperty(this, key, {
-        get: () => data[i],
-        set: (v) => {
-          v = parseNumber(v);
-          if (v != null) {
-            data[i] = v;
-          }
-        }
-      })
-    }
-
-    for (let i of this.range) {
-      let value = 0;
-      if (i < input.length) {
-        value = input[i];
-      }
-
-      data[i] = value;
-
-      addKey(i);
-      if (i < keys.length) {
-        addKey(keys[i], i);
-      }
-    }
-  }
-
-  parse(value){
-    if (value instanceof Vector && value.dimension == this.dimension) {
-      return value;
-    }
-
-    return new Vector(value, this.dimension);
-  }
-
-  applyPeiceWiseWith(value, op) {
-    let num = parseNumber(value);
-    let get = (i) => num;
-    if (typeof value !== "number") {
-      value = this.parse(value);
-      get = (i) => value[i];
-    }
-
-    let nv = [];
-    if (op instanceof Function) {
-      for (let i of this.range) {
-        nv[i] = op(this[i], get(i));
-      }
-    }
-
-    return this.parse(nv);
-  }
-
-  add(value){
-    return this.applyPeiceWiseWith(value, (a, b) => a + b)
-  }
-
-  sub(value){
-    return this.applyPeiceWiseWith(value, (a, b) => a - b)
-  }
-
-  mul(value){
-    return this.applyPeiceWiseWith(value, (a, b) => a * b)
-  }
-
-  div(value) {
-    return this.applyPeiceWiseWith(value, (a, b) => a / b)
-  }
-
-  normalize(){
-    let norm = this.norm();
-    for (let i of this.range) {
-      this[i] /= norm;
-    }
-  }
-
-  norm(){
-    let sum = 0;
-    for (let i of this.range){
-      sum += this[i]*this[i];
-    }
-    return Math.sqrt(sum);
-  }
-
-  dir(){
-    let norm = this.norm();
-    return this.div(norm);
-  }
-
-  dot(value){
-    value = this.parse(value);
-    let sum = 0;
-    for (let i of this.range) {
-      sum += this[i]*value[i];
-    }
-    return sum;
-  }
-
-  dist(v) {
-    v = this.parse(v);
-    let delta = v.sub(this);
-    return delta.norm();
-  }
-
-  get range(){
-    let n = this.dimension;
-    let itterable = {
-      *[Symbol.iterator]() {
-          for (let i = 0; i < n; i++) {
-            yield i;
-          }
-      }
-    }
-    return itterable
-  }
-
-  toString(){
-    let str = "";
-    for (let i of this.range) {
-      if (i != 0) {
-        str += ", ";
-      }
-      str += numberToString(this[i]);
-    }
-    return str;
-  }
-
-  toJSON(){
-    return this.toString();
-  }
-}
-
-
-
 function cos(x) {
   return Math.cos(x);
 }
-
 function sin(x) {
   return Math.sin(x);
 }
 
-function sqrt(v){
-  return Math.sqrt(v);
+function argumentParser(args, className) {
+  let v = args[0];
+  if (!(v instanceof className)) {
+    //array
+    if (v instanceof Array) {
+      v = className.fromArray(v);
+
+    //number
+    } else if (typeof v === "number") {
+      v = className.fromArray(args);
+
+    // string
+    } else if (typeof v === "string") {
+      v = className.fromString(v);
+    } else {
+      v = new className;
+    }
+  }
+
+  return v;
 }
 
-class Vector3D extends Vector{
-  constructor(input) {
-    super(input, 3);
+function argumentsIs(args, className) {
+  for (let arg of args) {
+    if (!(arg instanceof className)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+class Vector {
+  constructor(x = 0, y = 0, z = 0) {
+    this._x = x;
+    this._y = y;
+    this._z = z;
   }
 
-  rotateZ(theta) {
-    theta = parseNumber(theta);
-    if (theta == null) theta = 0;
-    let x = this.x;
-    let y = this.y;
-    this.x = x * Math.cos(theta) - y * Math.sin(theta);
-    this.y = x * Math.sin(theta) + y * Math.cos(theta);
-    return this;
+  get x(){return this._x}
+  get y(){return this._y}
+  get z(){return this._z}
+
+  set x(x){
+    this._x = Vector.number(x);
   }
-  rotateY(theta) {
-    theta = parseNumber(theta);
-    if (theta == null) theta = 0;
-    let x = this.x;
-    let z = this.z;
-    this.x = x * Math.cos(theta) + z * Math.sin(theta);
-    this.z = -x * Math.sin(theta) + z * Math.cos(theta);
-    return this;
+  set y(y){
+    this._y = Vector.number(y);
   }
-  rotateX(theta) {
-    theta = parseNumber(theta);
-    if (theta == null) theta = 0;
-    let z = this.z;
-    let y = this.y;
-    console.log(y);
-    this.y = y * Math.cos(theta) - z * Math.sin(theta);
-    console.log(y);
-    this.z = y * Math.sin(theta) + z * Math.cos(theta);
-    return this;
+  set z(z){
+    this._z = Vector.number(z);
   }
 
-  cross(v) {
-    v = this.parse(v);
+  //
+  set() {
+    let v = this.parser(arguments);
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
+  }
 
-    return this.parse([
+  pwo(v, op) {
+    return new Vector(op(this.x, v.x), op(this.y, v.y), op(this.z, v.z))
+  }
+  pws(v, op) {
+    return op(this.x, v.x) + op(this.y, v.y) + op(this.z, v.z);
+  }
+
+  // peice wise operations
+  add() {
+    let v = this.parser(arguments);
+    return this.pwo(v, (a, b) => a + b);
+  }
+
+  mul() {
+    let a1 = arguments[0];
+    if (a1 instanceof Rotation) {
+      return a1.vecMul(this);
+    } else {
+      let v = this.parser(arguments);
+      return this.pwo(v, (a, b) => a * b);
+    }
+  }
+
+  div() {
+    let v = this.parser(arguments);
+    return this.pwo(v, (a, b) => a / b);
+  }
+
+  sub() {
+    let v = this.parser(arguments);
+    return this.pwo(v, (a, b) => a - b)
+  }
+
+  dot() {
+    let v = this.parser(arguments);
+    return this.pws(v, (a, b) => a * b)
+  }
+
+  // derived operations
+  norm() {
+    return sqrt(this.dot(this));
+  }
+
+  normalize() {
+    this.set(this.unit());
+  }
+
+  unit() {
+    return this.div(this.norm());
+  }
+
+  dist() {
+    let v = this.parser(arguments);
+    return v.sub(this).norm();
+  }
+
+  clone(){
+    return this.mul(1);
+  }
+
+  // vector specific operations
+  cross() {
+    let v = this.parser(arguments);
+
+    return new Vector(
       this.y*v.z - this.z*v.y,
       this.z*v.x - this.x*v.z,
       this.x*v.y - this.y*v.x
-    ])
+    )
   }
 
-  rotate(r = "0, 0, 0") {
-    if (!(r instanceof Rotation)) {
-      let v = this.parse(r);
-      r = new Rotation();
-      r.fromAxisRotation(v);
+  parser(args) {
+    return argumentParser(args, Vector);
+  }
+
+  static parse() {
+    return argumentParser(arguments, Vector);
+  }
+
+  static fromArray(a, i=0){
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    let n = a.length - i;
+    if (n > 0) {
+      x = Vector.number(a[i]);
+      y = x;
+      z = x;
     }
 
-    return r.apply(this);
-  }
-
-  parse(value){
-    if (value instanceof Vector3D) {
-      return value;
+    if (n > 1) {
+      y = Vector.number(a[i+1])
+      z = 0;
     }
 
-    return new Vector3D(value);
-  }
-}
-
-function v3(v) {
-  return new Vector3D(v);
-}
-
-
-class Plane {
-  constructor(norm, tangent) {
-    this.norm = norm;
-    this.tangent = tangent;
-  }
-
-  get norm(){
-    return this._norm;
-  }
-  get tangent(){
-    return this._tangent;
-  }
-
-  set norm(v){
-    this._norm = v3(v).dir();
-  }
-  set tangent(v){
-    this._tangent = v3(v).dir();
-  }
-
-  projection(v) {
-    v = v3(v);
-    let x = v.dot(this.norm);
-    let y = v.dot(this.tangent);
-    return new Vector([x, y]);
-  }
-
-  rotate(v){
-    if (v instanceof Rotation) {
-      v.apply(this.norm);
-      v.apply(this.tangent);
-    } else {
-      this.norm.rotate(v);
-      this.tangent.rotate(v);
+    if (n > 2) {
+      z = Vector.number(a[i + 2]);
     }
-  }
-  // rotateY(v){
-  //   this.norm.rotateY(v);
-  //   this.tangent.rotateY(v);
-  // }
-  // rotateZ(v){
-  //   this.norm.rotateZ(v);
-  //   this.tangent.rotateZ(v);
-  // }
 
-  toString(){
-    return `N${this.norm} T${this.tangent}`
+    return new Vector(x, y, z);
+  }
+
+  static fromString(str) {
+    let words = str.split(/,\s*/g);
+    let x = Vector.number(words[0])
+    let y = Vector.number(words[1])
+    let z = Vector.number(words[2])
+    return new Vector(x, y, z);
+  }
+
+  static number(value) {
+    if (typeof value === "string") {
+      value = parseFloat(value);
+    }
+
+    if (typeof value !== "number") {
+      value = NaN;
+    }
+
+    return value;
+  }
+
+  static is(){
+    return argumentsIs(arguments, Vector);
   }
 }
 
 class Quaternion extends Vector {
-  constructor(input) {
-    super(input, 4, ["w", "x", "y", "z"]);
+  constructor(w = 0, x = 0, y = 0, z = 0) {
+    super(x, y, z);
+    this._w = w;
   }
 
-  // https://www.xarg.org/proof/quaternion-from-two-vectors/
-  fromTo(v1, v2) {
-    v1 = v3(v1).dir();
-    v2 = v3(v2).dir();
+  pwo(v, op) {
+    return new Quaternion(op(this.w, v.w), op(this.x, v.x), op(this.y, v.y), op(this.z, v.z))
+  }
+  pws(v, op) {
+    return op(this.w, v.w) + op(this.x, v.x) + op(this.y, v.y) + op(this.z, v.z);
+  }
 
-    let v1n = v1.norm();
-    let v2n = v2.norm();
+  set w(v){this._w = Vector.number(v)}
+  get w(){return this._w;}
 
-    let dot = v1.dot(v2);
-
-    this.w = 1 + v1.dot(v2) / (v1n * v2n);
-
-    let v = v1.cross(v2).div(v1n * v2n);
+  set() {
+    let v = this.parser(arguments);
+    this.w = v.w;
     this.x = v.x;
     this.y = v.y;
     this.z = v.z;
-
-    this.normalize()
   }
 
-  static fromTo(v1, v2) {
-    let q = new Quaternion();
-    q.fromTo(v1, v2);
-    return q;
-  }
-
-  mul(v){
-    let q = this.parse(v);
+  // https://cseweb.ucsd.edu/classes/wi18/cse169-a/slides/CSE169_03.pdf
+  product(){
+    let q = this.parser(arguments);
     let p = this;
-    let res = [];
-    res[0] = p.w * q.w - p.x * q.x - p.y * q.y - p.z * q.z;
-    res[1] = p.w * q.x + p.x * q.w + p.y * q.z - p.z * q.y;
-    res[2] = p.w * q.y + p.y * q.w - p.x * q.z + p.z * q.x;
-    res[3] = p.w * q.z + p.z * q.w + p.x * q.y - p.y * q.x;
 
-    return this.parse(res);
+    let w = p.w * q.w - p.x * q.x - p.y * q.y - p.z * q.z;
+    let x = p.w * q.x + p.x * q.w + p.y * q.z - p.z * q.y;
+    let y = p.w * q.y + p.y * q.w - p.x * q.z + p.z * q.x;
+    let z = p.w * q.z + p.z * q.w + p.x * q.y - p.y * q.x;
+
+    return new Quaternion(w, x, y, z);
   }
 
-  parse(value){
-    if (value instanceof Quaternion) {
-      return value;
+  parser(args) {
+    return argumentParser(args, Quaternion);
+  }
+
+  static parse() {
+    return argumentParser(arguments, Quaternion);
+  }
+
+  static fromArray(a, i=0){
+    let w = 0;
+    let x = 0;
+    let y = 0;
+    let z = 0;
+
+    let n = a.length - i;
+    if (n > 0) {
+      w = Vector.number(a[i]);
+      x = w;
+      y = w;
+      z = w;
+    }
+    if (n > 1) {
+      x = Vector.number(a[i+1])
+      y = 0;
+      z = 0;
     }
 
-    return new Quaternion(value);
+    if (n > 2) {
+      y = Vector.number(a[i + 2]);
+      z = 0;
+    }
+
+    if (n > 3) {
+      z = Vector.number(a[i + 3]);
+    }
+
+    return new Quaternion(w, x, y, z);
+  }
+
+  static fromString(str) {
+    let words = str.split(/,\s*/g);
+    let w = Vector.number(words[0])
+    let x = Vector.number(words[1])
+    let y = Vector.number(words[2])
+    let z = Vector.number(words[3])
+    return new Quaternion(w, x, y, z);
+  }
+
+  static is(){
+    return argumentsIs(arguments, Quaternion);
+  }
+
+  // https://www.xarg.org/proof/quaternion-from-two-vectors/
+  static fromTo(v1, v2, normalize = true) {
+    let q = null;
+    if (Vector.is(v1, v2)) {
+      let v1n = v1.norm();
+      let v2n = v2.norm();
+      if (normalize) {
+        v1 = v1.div(v1n);
+        v2 = v2.div(v2n);
+        v1n = 1;
+        v2n = 1;
+      }
+      // console.log(v1n, v2n);
+      let dot = v1.dot(v2);
+      let w = 1 + v1.dot(v2) / (v1n * v2n);
+      let v = v1.cross(v2).div(v1n * v2n);
+      q = new Quaternion(w, v.x, v.y, v.z);
+    }else {
+      q = new Quaternion
+    }
+
+    return q;
   }
 }
 
 class Rotation{
   constructor(value){
-    this[0] = [1, 0, 0];
-    this[1] = [0, 1, 0];
-    this[2] = [0, 0, 1];
+    if (value instanceof Array) {
+      this[0] = value[0];
+      this[1] = value[1];
+      this[2] = value[2];
+    } else {
+      this[0] = [0,0,0];
+      this[1] = [0,0,0];
+      this[2] = [0,0,0];
+    }
+  }
 
-    if (value instanceof Vector3D) {
-      this.fromAxisRotation(value);
-    } else if (value instanceof Quaternion) {
-      this.fromQuaternion(value);
-    } else if (value instanceof Rotation) {
+  set(r){
+    if (r instanceof Rotation) {
       for (let i = 0; i < 3; i++)
         for (let j = 0; j < 3; j++)
-          this[i][j] = value[i][j]
+          this[i][j] = r[i][j]
     }
   }
 
   fromTo(v1, v2) {
-    let q = new Quaternion();
-    q.fromTo(v1, v2);
-    this.fromQuaternion(q);
-    return this;
+    let r = Rotation.fromTo(v1, v2);
+    this.set(r);
   }
 
   fromQuaternion(q) {
-    q = new Quaternion(q).dir();
-    let w = q.w;
-    let x = q.x;
-    let y = q.y;
-    let z = q.z;
-
-    // https://cseweb.ucsd.edu/classes/wi18/cse169-a/slides/CSE169_03.pdf
-    this[0] = [1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w,     2*x*z + 2*y*w];
-    this[1] = [2*x*y + 2*z*w,     1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w];
-    this[2] = [2*x*z - 2*y*w,     2*y*z + 2*x*w,     1 - 2*x*x - 2*y*y];
-
-    return this;
+    let r = Rotation.fromQuaternion(q);
+    this.set(r);
   }
 
+  static fromTo(v1, v2) {
+    let q = Quaternion.fromTo(v1, v2);
+    return Roation.fromQuaternion(q);
+  }
+
+  // https://cseweb.ucsd.edu/classes/wi18/cse169-a/slides/CSE169_03.pdf
   static fromQuaternion(q) {
-    let r = new Rotation();
-    r.fromQuaternion(q);
-    return r;
+    let res = null;
+    if (Quaternion.is(q)) {
+      q = q.unit();
+      let w = q.w;
+      let x = q.x;
+      let y = q.y;
+      let z = q.z;
+      res = [
+        [1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w,     2*x*z + 2*y*w],
+        [2*x*y + 2*z*w,     1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w],
+        [2*x*z - 2*y*w,     2*y*z + 2*x*w,     1 - 2*x*x - 2*y*y],
+      ]
+    }
+    return new Rotation(res);
   }
 
-  static fromTo(q) {
-    let r = new Rotation();
-    r.fromTo(q);
-    return r;
-  }
-
-  fromAxisRotation(v) {
-    v = v3(v);
+  // wikipedia 3d euler rotation
+  static fromAxisRotation() {
+    let v = argumentParser(arguments, Vector);
     let a = v.x;
     let b = v.y;
     let g = v.z;
 
-    this[0] = [];
-    this[1] = [];
-    this[2] = [];
+    let ca = cos(a);
+    let sa = sin(a);
+    let cb = cos(b);
+    let sb = sin(b);
+    let cg = cos(g);
+    let sg = sin(g);
 
-    this[0][0] = cos(b)*cos(g);
-    this[0][1] = sin(a)*sin(b)*cos(g) - cos(a)*sin(g);
-    this[0][2] = cos(a)*sin(b)*cos(g) + sin(a)*sin(g);
-    this[1][0] = cos(b)*sin(g);
-    this[1][1] = sin(a)*sin(b)*sin(g) + cos(a)*cos(g);
-    this[1][2] = cos(a)*sin(b)*sin(g) - sin(a)*cos(g);
-    this[2][0] = -sin(b);
-    this[2][1] = sin(a)*cos(b);
-    this[2][2] = cos(a)*cos(b);
+    let res = [
+      [cb*cg, sa*sb*cg - ca*sg, ca*sb*cg + sa*sg],
+      [cb*sg, sa*sb*sg + ca*cg, ca*sb*sg - sa*cg],
+      [-sb,   a*cb,             ca*cb           ]
+    ]
+    return new Rotation(res);
   }
 
   mul(r){
-    let nv = [[],[],[]]
+    let nv = [[0, 0, 0],[0, 0, 0],[0, 0, 0]]
     if (r instanceof Rotation) {
       for (let i = 0; i < 3; i++) {
         for (let k = 0; k < 3; k++) {
@@ -505,27 +397,21 @@ class Rotation{
           nv[i][k] = value;
         }
       }
-
-
-      for (let i = 0; i < 3; i++) {
-        for (let k = 0; k < 3; k++) {
-          this[i][k] = nv[i][k];
-        }
-      }
     }
+    return new Rotation(nv);
   }
 
-  apply(v){
-    let x = v.x;
-    let y = v.y;
-    let z = v.z;
-    let r = this;
-
-    let vx = x*r[0][0] + y*r[0][1] + z*r[0][2];
-    let vy = x*r[1][0] + y*r[1][1] + z*r[1][2];
-    let vz = x*r[2][0] + y*r[2][1] + z*r[2][2];
-
-    return v3([vx, vy, vz]);
+  vecMul(v){
+    if (v instanceof Vector) {
+      let r = this;
+      return new Vector(
+        v.x*r[0][0] + v.y*r[0][1] + v.z*r[0][2],
+        v.x*r[1][0] + v.y*r[1][1] + v.z*r[1][2],
+        v.x*r[2][0] + v.y*r[2][1] + v.z*r[2][2]
+      );
+    } else {
+      return new Vector;
+    }
   }
 
   toString(){
@@ -541,8 +427,53 @@ class Rotation{
     }
     return str
   }
-
-
 }
 
-export {Vector, Vector3D, v3, Plane, Rotation, Quaternion}
+class BBox {
+  constructor(firstValue){
+    this._min = null;
+    this._max = null;
+    if (firstValue) {
+      this.add(firstValue);
+    }
+  }
+
+  get min(){
+    return this._min.clone();
+  }
+
+  get max(){
+    return this._max.clone();
+  }
+
+  get center(){
+    return this._min.add(this._max).div(2)
+  }
+
+  add(){
+    let value = arguments[0];
+    if (value instanceof BBox) {
+      this.addPoint(value._min);
+      this.addPoint(value._max);
+    } else {
+      value = argumentParser(arguments, Vector);
+      this.addPoint(value);
+    }
+  }
+
+  addPoint(v){
+    if (this._min == null) this._min = v.clone();
+    if (this._max == null) this._max = v.clone();
+
+    for (let i of ["x", "y", "z"]) {
+      if (v[i] < this._min[i]) this._min[i] = v[i];
+      if (v[i] > this._max[i]) this._max[i] = v[i];
+    }
+  }
+}
+
+function v3(){
+  return argumentParser(arguments, Vector);
+}
+
+export {BBox, Vector, Quaternion, Rotation, v3, argumentParser}
