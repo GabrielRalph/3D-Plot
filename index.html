@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>
+    </title>
+    <script type = "module" src = "./dress-graph.js">
+    </script>
+  </head>
+  <body>
+    <svg id = "defs">
+      <defs>
+        <filter id="glow" height="300%" width="300%" x="-75%" y="-75%">
+          <feMorphology operator="dilate" radius="1" in="SourceAlpha" result="thicken" />
+          <feGaussianBlur in="thicken" stdDeviation="5" result="blurred" />
+          <feFlood flood-color="rgb(255,255,255)" result="glowColor" />
+          <feComposite in="glowColor" in2="blurred" operator="in" result="softGlow_colored" />
+          <feMerge>
+            <feMergeNode in="softGlow_colored"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+    </svg>
+    <dress-graph file = "./data/grid.json">
+
+    </dress-graph>
+  </body>
+  <script type="module">
+    import {GameOfLife} from "./gameOfLife.js";
+    let a = async () => {
+      let dress = document.querySelector("dress-graph");
+      await dress.ready();
+
+      let game = new GameOfLife(dress.n, dress.m);
+      game.set = dress.set;
+      game.get = dress.get;
+
+      game.addMW(7, 7)
+      game.addGlider(10, 10);
+      game.addGlider(0, 30);
+      game.addGlider(20, 20);
+      game.addGlider(33, 12);
+
+
+      let goal = 0.04;
+      let dir = -1;
+      dress.onmousemove = (e) => {
+        if (e.buttons == 1) {
+          dir = e.movementX > 0 ? -1 : 1;
+        }
+      }
+
+      dress.addEventListener("render", () => {
+        dress.rotate(goal * dir);
+        game.nextIterration();
+      })
+    }
+    a();
+
+  </script>
+
+  <style media="screen">
+    body{
+      background: #7a4141;
+      fill: black;
+      margin: auto;
+    }
+
+    #defs {
+      display: none;
+    }
+    .alive {
+      fill: white;
+      filter: url(#glow);
+    }
+
+    svg-3d {display: block;}
+    dress-graph {display: block;}
+
+    svg {
+      max-height: 100vh;
+      max-width: 100vw;
+      display: block;
+    }
+
+    .cord {
+      fill: none;
+      stroke: white;
+      opacity: 0.4;
+    }
+
+  </style>
+</html>

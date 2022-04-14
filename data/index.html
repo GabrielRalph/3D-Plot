@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+  </head>
+  <body>
+    <div id = b1>
+      MAKE GRID
+    </div>
+  </body>
+
+  <script type = "module">
+    import {saveGrid, loadGrid} from "./gridMaker.js"
+
+    document.getElementById("b1").onclick = () => {
+      let name = prompt("Please provide the filename of the svg splines!");
+      if (name) {
+        saveGrid(name + ".svg", 40, 50);
+      }
+    }
+
+    let a = async () => {
+      let grid = await loadGrid("grid.json")
+      console.log(grid);
+    }
+    a();
+  </script>
+</html>
