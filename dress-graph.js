@@ -68,10 +68,10 @@ class DressGraph extends SvgPlus {
       line.props.class = "cord"
     }
 
-    for (let j = 0; j < m - 1; j++) {
+    for (let j = 0; j < m; j++) {
       let path = [];
-      for (let i = 0; i < n; i++) {
-        path.push(grid[j][i]);
+      for (let i = 0; i < n + 1; i++) {
+        path.push(grid[j][i%n]);
       }
       let line = paths3D.addPath(path);
       line.props.class = "cord"

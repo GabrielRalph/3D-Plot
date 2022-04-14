@@ -44,7 +44,7 @@
       game.addGlider(33, 12);
 
 
-      let goal = 0.04;
+      let goal = 0.02;
       let dir = -1;
       dress.onmousemove = (e) => {
         if (e.buttons == 1) {
@@ -63,7 +63,7 @@
 
   <style media="screen">
     body{
-      background: #7a4141;
+      background: black;
       fill: black;
       margin: auto;
     }
@@ -76,8 +76,16 @@
       opacity: 0.2;
     }
     .alive {
-      fill: white;
-      /* filter: url(#glow); */
+      fill: orange;
+    }
+    .alive:nth-of-type(3n) {
+      fill: #ff6600;
+    }
+    .alive:nth-of-type(5n) {
+      fill: red;
+    }
+    .alive:nth-of-type(7n) {
+      fill: yellow;
     }
 
     svg-3d {display: block;}
