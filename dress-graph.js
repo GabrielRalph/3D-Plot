@@ -101,8 +101,8 @@ class DressGraph extends SvgPlus {
 
     plot.onmousemove = (e) => {
       if (e.buttons == 1) {
-        let dx = -e.movementX/200;
-        let dy = -e.movementY/200;
+        let dx = e.movementX/200;
+        let dy = e.movementY/200;
         plot.rotate(dx, dy);
       }
     }

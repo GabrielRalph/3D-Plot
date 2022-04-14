@@ -341,7 +341,7 @@ class Svg3D extends SvgPlus {
 
   addRotationControlls(){
     let tv = 0.4;
-    let th = -0.37;
+    let th = -.05;
 
     this.rotate = (x = 0, y = 0) => {
       tv += y;
